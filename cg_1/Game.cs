@@ -1,52 +1,118 @@
 ﻿using System;
+using OpenTK;
 using OpenTK.Windowing.Common;
 using OpenTK.Windowing.Desktop;
 using OpenTK.Graphics.OpenGL4;
 using OpenTK.Mathematics;
+using System;
+using CompGraph;
 
 namespace CompGraph
 {
-    class Hexagon : GameWindow
+    public class Game : GameWindow
     {
-        private readonly float[] vertices = new float[12];
         private VertexBuffer vertexBuffer;
         private IndexBuffer indexBuffer;
         private VertexArray vertexArray;
-        private Shader shader;
+        private Shader shaderProgram;
 
         private int vertexCount;
         private int indexCount;
 
-        private float time = 0.0f;
-        private float duration = 2.0f;
-        private Vector2 startPosition = new Vector2(-0.5f, 0.0f);
-        private Vector2 endPosition = new Vector2(0.5f, 0.0f);
+        private float colorFactor = 1f;
+        private float deltaColorFactor = 1f / 240f;
 
-        public Hexagon(GameWindowSettings settings, NativeWindowSettings nativeWindowSettings) : base(settings, nativeWindowSettings)
+        public Game(int width = 1280, int height = 768, string title = "Game1")
+            : base(
+                  GameWindowSettings.Default,
+                  new NativeWindowSettings()
+                  {
+                      Title = title,
+                      Size = new Vector2i(width, height),
+                      WindowBorder = WindowBorder.Fixed,
+                      StartVisible = false,
+                      StartFocused = true,
+                      API = ContextAPI.OpenGL,
+                      Profile = ContextProfile.Core,
+                      APIVersion = new Version(3, 3)
+                  })
         {
+            this.CenterWindow();
+        }
 
+        protected override void OnResize(ResizeEventArgs e)
+        {
+            GL.Viewport(0, 0, e.Width, e.Height);
+            base.OnResize(e);
         }
 
         protected override void OnLoad()
         {
-            base.OnLoad();
+            this.IsVisible = true;
 
             GL.ClearColor(0.8f, 0.8f, 0.8f, 1f);
 
-            for (int i = 0; i < 6; i++)
+            Random rand = new Random();
+
+            int windowWidth = this.ClientSize.X;
+            int windowHeight = this.ClientSize.Y;
+
+            int Count = 1;
+
+            VertexPositionColor[] vertices = new VertexPositionColor[Count * 6];
+            this.vertexCount = 0;
+
+            for (int i = 0; i < Count; i++)
             {
-                float angle = MathHelper.DegreesToRadians(60 * i);
-                vertices[i * 2] = MathF.Cos(angle) * 0.5f;
-                vertices[i * 2 + 1] = MathF.Sin(angle) * 0.5f;
+                int w = 300;
+                int h = 300;
+                int x = 600;
+                int y = 150;
+
+                float r = (float)rand.NextDouble();
+                float g = (float)rand.NextDouble();
+                float b = (float)rand.NextDouble();
+
+                vertices[this.vertexCount++] = new VertexPositionColor(new Vector2(x - (w * 0.5f), y + h / 2), new Color4(r, g, b, 1f));
+                vertices[this.vertexCount++] = new VertexPositionColor(new Vector2(x, y + h), new Color4(r, g, b, 1f));
+                vertices[this.vertexCount++] = new VertexPositionColor(new Vector2(x + w, y + h), new Color4(r, g, b, 1f));
+                vertices[this.vertexCount++] = new VertexPositionColor(new Vector2(x + (w * 1.5f), y + h / 2), new Color4(r, g, b, 1f));
+                vertices[this.vertexCount++] = new VertexPositionColor(new Vector2(x + (w * 1.5f), y + h / 2), new Color4(r, g, b, 1f));
+                vertices[this.vertexCount++] = new VertexPositionColor(new Vector2(x + (w * 0.5f), y), new Color4(r, g, b, 1f));
             }
+
+
+            int[] indices = new int[Count * 12];
+            this.indexCount = 0;
+            this.vertexCount = 0;
+
+            for (int i = 0; i < Count; i++)
+            {
+                indices[this.indexCount++] = 0 + this.vertexCount;
+                indices[this.indexCount++] = 1 + this.vertexCount;
+                indices[this.indexCount++] = 2 + this.vertexCount;
+                indices[this.indexCount++] = 0 + this.vertexCount;
+                indices[this.indexCount++] = 2 + this.vertexCount;
+                indices[this.indexCount++] = 3 + this.vertexCount;
+                indices[this.indexCount++] = 0 + this.vertexCount;
+                indices[this.indexCount++] = 3 + this.vertexCount;
+                indices[this.indexCount++] = 4 + this.vertexCount;
+                indices[this.indexCount++] = 0 + this.vertexCount;
+                indices[this.indexCount++] = 4 + this.vertexCount;
+                indices[this.indexCount++] = 5 + this.vertexCount;
+
+                this.vertexCount += 6;
+            }
+
 
             this.vertexBuffer = new VertexBuffer(VertexPositionColor.VertexInfo, vertices.Length, true);
             this.vertexBuffer.SetData(vertices, vertices.Length);
 
-            //this.indexBuffer = new IndexBuffer(indices.Length, true);
-            //this.indexBuffer.SetData(indices, indices.Length);
+            this.indexBuffer = new IndexBuffer(indices.Length, true);
+            this.indexBuffer.SetData(indices, indices.Length);
 
             this.vertexArray = new VertexArray(this.vertexBuffer);
+
 
             string vertexShaderCode =
                 @"
@@ -84,46 +150,47 @@ namespace CompGraph
                 }
                 ";
 
-            this.shader = new Shader(vertexShaderCode, pixelShaderCode);
+            this.shaderProgram = new Shader(vertexShaderCode, pixelShaderCode);
+
+
 
             int[] viewport = new int[4];
             GL.GetInteger(GetPName.Viewport, viewport);
 
-            GL.UseProgram(this.shader.ShaderProgramHandle);
-            int viewportSizeUniformLocation = GL.GetUniformLocation(this.shader.ShaderProgramHandle, "ViewportSize");
-            GL.Uniform2(viewportSizeUniformLocation, (float)viewport[2], (float)viewport[3]);
-            GL.UseProgram(0);
+            this.shaderProgram.SetUniform("ViewportSize", (float)viewport[2], (float)viewport[3]);
+            this.shaderProgram.SetUniform("ColorFactor", this.colorFactor);
+
+
+            base.OnLoad();
+        }
+
+        protected override void OnUnload()
+        {
+            this.vertexArray?.Dispose();
+            this.indexBuffer?.Dispose();
+            this.vertexBuffer?.Dispose();
+
+            base.OnUnload();
         }
 
         protected override void OnUpdateFrame(FrameEventArgs args)
         {
             base.OnUpdateFrame(args);
+
+            ште
         }
 
         protected override void OnRenderFrame(FrameEventArgs args)
         {
-            base.OnRenderFrame(args);
-
             GL.Clear(ClearBufferMask.ColorBufferBit);
 
-            float t = Math.Min(time / duration, 1.0f);
-            Vector2 interpolatedPosition = Vector2.Lerp(startPosition, endPosition, t);
-
-            GL.UseProgram(this.shader.ShaderProgramHandle);
-            int translationLocation = GL.GetUniformLocation(this.shader.ShaderProgramHandle, "uTranslation");
-            GL.Uniform2(translationLocation, interpolatedPosition);
-
+            GL.UseProgram(this.shaderProgram.ShaderProgramHandle);
             GL.BindVertexArray(this.vertexArray.VertexArrayHandle);
-            GL.DrawArrays(PrimitiveType.Points, 0, 6);
-
-            time += (float)args.Time;
-            if (time >= duration)
-            {
-                time = 0.0f;
-                (startPosition, endPosition) = (endPosition, startPosition);
-            }
+            GL.BindBuffer(BufferTarget.ElementArrayBuffer, this.indexBuffer.IndexBufferHandle);
+            GL.DrawElements(PrimitiveType.Triangles, this.indexCount, DrawElementsType.UnsignedInt, 0);
 
             this.Context.SwapBuffers();
+            base.OnRenderFrame(args);
         }
     }
 }
