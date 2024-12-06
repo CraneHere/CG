@@ -17,8 +17,8 @@ public void SetUniform(string name, Matrix3 matrix)
         matrix.M13, matrix.M23, matrix.M33
     };
 
-    // Активируем шейдер и передаем данные
+    // Передаем данные в шейдер
     GL.UseProgram(this.ShaderProgramHandle);
-    GL.UniformMatrix3fv(uniform.Location, 1, false, matrixData);
+    GL.UniformMatrix3(uniform.Location, false, matrixData);
     GL.UseProgram(0);
 }
