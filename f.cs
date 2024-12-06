@@ -1,24 +1,32 @@
-public void SetUniform(string name, Matrix3 matrix)
+protected override void OnUpdateFrame(FrameEventArgs args)
 {
-    if (!this.GetShaderUniform(name, out ShaderUniform uniform))
+    this.animationTime += this.animationSpeed;
+    if (this.animationTime >= 1f)
     {
-        throw new ArgumentException($"Uniform '{name}' was not found.");
+        this.animationTime = 0f;
+
+        // Смена начальной и целевой позиции
+        var tempShape = this.initialShape;
+        this.initialShape = this.targetShape;
+        this.targetShape = tempShape;
+
+        var tempOffset = this.positionOffset;
+        this.positionOffset = this.targetOffset;
+        this.targetOffset = tempOffset;
     }
 
-    if (uniform.Type != ActiveUniformType.FloatMat3)
+    // Линейная интерполяция формы
+    for (int i = 0; i < this.currentShape.Length; i++)
     {
-        throw new ArgumentException($"Uniform '{name}' is not of type Matrix3.");
+        this.currentShape[i] = Vector2.Lerp(this.initialShape[i], this.targetShape[i], this.animationTime);
     }
 
-    // Преобразуем Matrix3 в массив float[]
-    float[] matrixData = {
-        matrix.M11, matrix.M21, matrix.M31,
-        matrix.M12, matrix.M22, matrix.M32,
-        matrix.M13, matrix.M23, matrix.M33
-    };
+    // Линейная интерполяция позиции
+    var interpolatedOffset = Vector2.Lerp(this.positionOffset, this.targetOffset, this.animationTime);
 
-    // Передаем данные в шейдер
-    GL.UseProgram(this.ShaderProgramHandle);
-    GL.UniformMatrix3(uniform.Location, false, matrixData);
-    GL.UseProgram(0);
+    // Создание трансляционной матрицы
+    var translationMatrix = CreateTranslationMatrix(interpolatedOffset.X, interpolatedOffset.Y);
+
+    // Передача матрицы в шейдер
+    this.shaderProgram.SetUniform("TranslationMatrix", translationMatrix);
 }
