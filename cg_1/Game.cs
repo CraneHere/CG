@@ -21,6 +21,13 @@ namespace CompGraph
         private Vector2[] targetShape;
         private Vector2[] currentShape;
 
+        private Matrix4 translationMatrix;
+
+        private float moveSpeed = 0.1f;
+        private float elapsedTime = 0.0f;
+
+        private Vector2 movementDirection = new Vector2(0.1f, 0);
+
         public Game(int width = 1280, int height = 768, string title = "Game1")
             : base(
                   GameWindowSettings.Default,
@@ -153,8 +160,32 @@ namespace CompGraph
             base.OnUnload();
         }
 
+        private void ApplyTransformation()
+        {
+            translationMatrix = Matrix4.CreateTranslation(moveSpeed, 0, 0);
+
+            for (int i = 0; i < currentShape.Length; i++)
+            {
+                Vector4 vertex = new Vector4(currentShape[i].X, currentShape[i].Y, 0, 1);
+                Vector4 transformedVertex = translationMatrix * vertex;
+                currentShape[i] = new Vector2(transformedVertex.X, transformedVertex.Y);
+            }
+        }
+
         protected override void OnUpdateFrame(FrameEventArgs args)
         {
+            base.OnUpdateFrame(args);
+
+            ApplyTransformation();
+
+            VertexPositionColor[] vertices = new VertexPositionColor[this.currentShape.Length];
+            for (int i = 0; i < this.currentShape.Length; i++)
+            {
+                vertices[i] = new VertexPositionColor(this.currentShape[i], new Color4(0.2f, 0.4f, 0.8f, 1f));
+            }
+
+            this.vertexBuffer.SetData(vertices, vertices.Length);
+
             base.OnUpdateFrame(args);
         }
 
