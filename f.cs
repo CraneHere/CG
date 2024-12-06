@@ -1,9 +1,14 @@
 public void SetUniform(string name, Matrix3 matrix)
 {
-    // Получаем локацию uniform-переменной в шейдере
-    int location = GL.GetUniformLocation(this.Handle, name);
-    if (location == -1)
-        throw new Exception($"Uniform '{name}' not found in shader.");
+    if (!this.GetShaderUniform(name, out ShaderUniform uniform))
+    {
+        throw new ArgumentException($"Uniform '{name}' was not found.");
+    }
+
+    if (uniform.Type != ActiveUniformType.FloatMat3)
+    {
+        throw new ArgumentException($"Uniform '{name}' is not of type Matrix3.");
+    }
 
     // Преобразуем Matrix3 в массив float[]
     float[] matrixData = {
@@ -12,6 +17,8 @@ public void SetUniform(string name, Matrix3 matrix)
         matrix.M13, matrix.M23, matrix.M33
     };
 
-    // Передаём данные в шейдер
-    GL.UniformMatrix3fv(location, 1, false, matrixData);
+    // Активируем шейдер и передаем данные
+    GL.UseProgram(this.ShaderProgramHandle);
+    GL.UniformMatrix3fv(uniform.Location, 1, false, matrixData);
+    GL.UseProgram(0);
 }
