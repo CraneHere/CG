@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Reflection.Metadata;
 using OpenTK.Graphics.OpenGL4;
+using OpenTK.Mathematics;
 
 namespace CompGraph
 {
@@ -97,6 +98,15 @@ namespace CompGraph
             ShaderAttribute[] result = new ShaderAttribute[this.attributes.Length];
             Array.Copy(this.attributes, result, this.attributes.Length);
             return result;
+        }
+        public static void SetUniform(this Shader shader, string name, Matrix3 matrix)
+        {
+            float[] matrixData = {
+                matrix.M11, matrix.M21, matrix.M31,
+                matrix.M12, matrix.M22, matrix.M32,
+                matrix.M13, matrix.M23, matrix.M33
+            };
+            shader.SetUniform(name, matrixData);
         }
 
         public void SetUniform(string name, float v1)
