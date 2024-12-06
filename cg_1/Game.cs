@@ -25,6 +25,8 @@ namespace CompGraph
         private Vector2[] targetShape;
         private Vector2[] currentShape;
 
+        private Matrix3 transformMatrix = Matrix3.Identity;
+
         public Game(int width = 1280, int height = 768, string title = "Game1")
             : base(
                   GameWindowSettings.Default,
@@ -159,13 +161,20 @@ namespace CompGraph
 
         protected override void OnUpdateFrame(FrameEventArgs args)
         {
+            base.OnUpdateFrame(args);
+
             this.animationTime += this.animationSpeed;
             if (this.animationTime >= 1f)
             {
                 this.animationTime = 0f;
-                var temp = this.initialShape;
+
+                var tempShape = this.initialShape;
                 this.initialShape = this.targetShape;
-                this.targetShape = temp;
+                this.targetShape = tempShape;
+
+                var tempOffset = this.positionOffset;
+                this.positionOffset = this.targetOffset;
+                this.targetOffset = tempOffset;
             }
 
             for (int i = 0; i < this.currentShape.Length; i++)
@@ -173,7 +182,11 @@ namespace CompGraph
                 this.currentShape[i] = Vector2.Lerp(this.initialShape[i], this.targetShape[i], this.animationTime);
             }
 
-            base.OnUpdateFrame(args);
+            var interpolatedOffset = Vector2.Lerp(this.positionOffset, this.targetOffset, this.animationTime);
+
+            var translationMatrix = CreateTranslationMatrix(interpolatedOffset.X, interpolatedOffset.Y);
+
+            this.shaderProgram.SetUniform("TranslationMatrix", translationMatrix);
         }
 
         protected override void OnRenderFrame(FrameEventArgs args)
@@ -182,9 +195,7 @@ namespace CompGraph
 
             GL.UseProgram(this.shaderProgram.ShaderProgramHandle);
 
-            Matrix3 transform = Matrix3.Identity;
-            transform.Row2 = new Vector3(this.positionOffset.X, this.positionOffset.Y, 1);
-            this.shaderProgram.SetUniform("Transform", transform);
+            this.shaderProgram.SetUniform("TransformMatrix", this.transformMatrix);
 
             GL.BindVertexArray(this.vertexArray.VertexArrayHandle);
             GL.BindBuffer(BufferTarget.ElementArrayBuffer, this.indexBuffer.IndexBufferHandle);
@@ -192,6 +203,15 @@ namespace CompGraph
 
             this.Context.SwapBuffers();
             base.OnRenderFrame(args);
+        }
+
+        public static Matrix3 CreateTranslationMatrix(float x, float y)
+        {
+            return new Matrix3(
+                1f, 0f, 0f,
+                0f, 1f, 0f,
+                x, y, 1f
+            );
         }
     }
 }
