@@ -1,25 +1,17 @@
-this.animationTime += this.animationSpeed;
-if (this.animationTime >= 1f)
+public void SetUniform(string name, Matrix3 matrix)
 {
-    this.animationTime = 0f;
+    // Получаем локацию uniform-переменной в шейдере
+    int location = GL.GetUniformLocation(this.Handle, name);
+    if (location == -1)
+        throw new Exception($"Uniform '{name}' not found in shader.");
 
-    // Меняем начальную и конечную формы местами
-    var temp = this.initialShape;
-    this.initialShape = this.targetShape;
-    this.targetShape = temp;
+    // Преобразуем Matrix3 в массив float[]
+    float[] matrixData = {
+        matrix.M11, matrix.M21, matrix.M31,
+        matrix.M12, matrix.M22, matrix.M32,
+        matrix.M13, matrix.M23, matrix.M33
+    };
 
-    // Обновляем конечное положение
-    this.positionOffset = this.targetOffset;
-    this.targetOffset = -this.targetOffset; // Возврат в исходное положение
+    // Передаём данные в шейдер
+    GL.UniformMatrix3fv(location, 1, false, matrixData);
 }
-
-// Обновляем текущую форму (анимация формы)
-for (int i = 0; i < this.currentShape.Length; i++)
-{
-    this.currentShape[i] = Vector2.Lerp(this.initialShape[i], this.targetShape[i], this.animationTime);
-}
-
-// Обновляем позицию (анимация смещения)
-Vector2 interpolatedPosition = Vector2.Lerp(this.positionOffset, this.targetOffset, this.animationTime);
-this.transformMatrix = Matrix3.CreateTranslation(interpolatedPosition);
-base.OnUpdateFrame(args);
