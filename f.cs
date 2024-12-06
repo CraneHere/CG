@@ -180,15 +180,19 @@ namespace BasicOpenTK
             GL.Clear(ClearBufferMask.ColorBufferBit);
 
             GL.UseProgram(this.shaderProgram.ShaderProgramHandle);
-
-            // Create transformation matrix
-            Matrix3 transform = Matrix3.CreateTranslation(this.positionOffset);
+        
+            // Создание трансформационной матрицы
+            Matrix3 transform = new Matrix3(
+                1, 0, this.positionOffset.X,
+                0, 1, this.positionOffset.Y,
+                0, 0, 1
+            );
             this.shaderProgram.SetUniform("Transform", transform);
-
+        
             GL.BindVertexArray(this.vertexArray.VertexArrayHandle);
             GL.BindBuffer(BufferTarget.ElementArrayBuffer, this.indexBuffer.IndexBufferHandle);
             GL.DrawElements(PrimitiveType.Triangles, this.indexCount, DrawElementsType.UnsignedInt, 0);
-
+        
             this.Context.SwapBuffers();
             base.OnRenderFrame(args);
         }
