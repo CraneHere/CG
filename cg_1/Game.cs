@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using OpenTK;
 using OpenTK.Windowing.Common;
 using OpenTK.Windowing.Desktop;
@@ -17,16 +17,11 @@ namespace CompGraph
         private int vertexCount;
         private int indexCount;
 
-        private Vector2[] initialShape;
-        private Vector2[] targetShape;
         private Vector2[] currentShape;
 
         private Matrix4 translationMatrix;
 
         private float moveSpeed = 0.1f;
-        private float elapsedTime = 0.0f;
-
-        private Vector2 movementDirection = new Vector2(0.1f, 0);
 
         public Game(int width = 1280, int height = 768, string title = "Game1")
             : base(
@@ -58,30 +53,20 @@ namespace CompGraph
 
             GL.ClearColor(0.8f, 0.8f, 0.8f, 1f);
 
-            this.initialShape = CreateHexagon(200, 200, 100);
-            this.targetShape = CreateHexagon(200, 200, 150); // Slightly larger hexagon
-            this.currentShape = new Vector2[this.initialShape.Length];
-            Array.Copy(this.initialShape, this.currentShape, this.initialShape.Length);
+            // Initialization code for other shapes or data can go here.
 
-            VertexPositionColor[] vertices = new VertexPositionColor[this.currentShape.Length];
-            for (int i = 0; i < this.currentShape.Length; i++)
+            VertexPositionColor[] vertices = new VertexPositionColor[]
             {
-                vertices[i] = new VertexPositionColor(this.currentShape[i], new Color4(0.2f, 0.4f, 0.8f, 1f));
-            }
-
+                new VertexPositionColor(new Vector2(0, 0), new Color4(0.2f, 0.4f, 0.8f, 1f)),
+                new VertexPositionColor(new Vector2(100, 0), new Color4(0.2f, 0.4f, 0.8f, 1f)),
+                new VertexPositionColor(new Vector2(50, 100), new Color4(0.2f, 0.4f, 0.8f, 1f))
+            };
 
             this.vertexCount = vertices.Length;
 
-            int[] indices = new int[(this.vertexCount - 2) * 3];
-            for (int i = 1; i < this.vertexCount - 1; i++)
-            {
-                indices[(i - 1) * 3] = 0;
-                indices[(i - 1) * 3 + 1] = i;
-                indices[(i - 1) * 3 + 2] = i + 1;
-            }
+            int[] indices = new int[] { 0, 1, 2 };
 
             this.indexCount = indices.Length;
-
 
             this.vertexBuffer = new VertexBuffer(VertexPositionColor.VertexInfo, vertices.Length, true);
             this.vertexBuffer.SetData(vertices, vertices.Length);
@@ -90,7 +75,6 @@ namespace CompGraph
             this.indexBuffer.SetData(indices, indices.Length);
 
             this.vertexArray = new VertexArray(this.vertexBuffer);
-
 
             string vertexShaderCode =
                 @"
@@ -136,19 +120,6 @@ namespace CompGraph
             this.shaderProgram.SetUniform("ViewportSize", (float)viewport[2], (float)viewport[3]);
 
             base.OnLoad();
-        }
-
-        private Vector2[] CreateHexagon(float centerX, float centerY, float radius)
-        {
-            Vector2[] vertices = new Vector2[6];
-            for (int i = 0; i < 6; i++)
-            {
-                float angle = MathHelper.TwoPi / 6 * i;
-                vertices[i] = new Vector2(
-                    centerX + radius * MathF.Cos(angle),
-                    centerY + radius * MathF.Sin(angle));
-            }
-            return vertices;
         }
 
         protected override void OnUnload()
