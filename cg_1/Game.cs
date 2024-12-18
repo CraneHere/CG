@@ -1,5 +1,4 @@
 using System;
-using OpenTK;
 using OpenTK.Windowing.Common;
 using OpenTK.Windowing.Desktop;
 using OpenTK.Graphics.OpenGL4;
@@ -9,34 +8,27 @@ namespace CompGraph
 {
     public class Game : GameWindow
     {
-        private VertexBuffer vertexBuffer;
-        private IndexBuffer indexBuffer;
-        private VertexArray vertexArray;
+        private VertexArray[] vertexArrays;
         private Shader shaderProgram;
 
-        private int vertexCount;
-        private int indexCount;
+        private Matrix4 projectionMatrix;
+        private Matrix4 viewMatrix;
+        private Matrix4[] modelMatrices;
 
-        private Vector2[] currentShape;
-
-        private Matrix4 translationMatrix;
-
-        private float moveSpeed = 0.1f;
-
-        public Game(int width = 1280, int height = 768, string title = "Game1")
+        public Game(int width = 1280, int height = 768, string title = "3D Scene")
             : base(
-                  GameWindowSettings.Default,
-                  new NativeWindowSettings()
-                  {
-                      Title = title,
-                      Size = new Vector2i(width, height),
-                      WindowBorder = WindowBorder.Fixed,
-                      StartVisible = false,
-                      StartFocused = true,
-                      API = ContextAPI.OpenGL,
-                      Profile = ContextProfile.Core,
-                      APIVersion = new Version(3, 3)
-                  })
+                GameWindowSettings.Default,
+                new NativeWindowSettings()
+                {
+                    Title = title,
+                    Size = new Vector2i(width, height),
+                    WindowBorder = WindowBorder.Fixed,
+                    StartVisible = false,
+                    StartFocused = true,
+                    API = ContextAPI.OpenGL,
+                    Profile = ContextProfile.Core,
+                    APIVersion = new Version(3, 3)
+                })
         {
             this.CenterWindow();
         }
@@ -44,6 +36,11 @@ namespace CompGraph
         protected override void OnResize(ResizeEventArgs e)
         {
             GL.Viewport(0, 0, e.Width, e.Height);
+            projectionMatrix = Matrix4.CreatePerspectiveFieldOfView(
+                MathHelper.DegreesToRadians(45f),
+                Size.X / (float)Size.Y,
+                0.1f,
+                100f);
             base.OnResize(e);
         }
 
@@ -51,127 +48,195 @@ namespace CompGraph
         {
             this.IsVisible = true;
 
-            GL.ClearColor(0.8f, 0.8f, 0.8f, 1f);
+            GL.ClearColor(0.2f, 0.3f, 0.3f, 1f);
+            GL.Enable(EnableCap.DepthTest);
 
-            // Initialization code for other shapes or data can go here.
+            string vertexShaderCode = @"
+            #version 330 core
 
-            VertexPositionColor[] vertices = new VertexPositionColor[]
+            layout (location = 0) in vec3 aPosition;
+
+            uniform mat4 projection;
+            uniform mat4 view;
+            uniform mat4 model;
+
+            void main()
             {
-                new VertexPositionColor(new Vector2(0, 0), new Color4(0.2f, 0.4f, 0.8f, 1f)),
-                new VertexPositionColor(new Vector2(100, 0), new Color4(0.2f, 0.4f, 0.8f, 1f)),
-                new VertexPositionColor(new Vector2(50, 100), new Color4(0.2f, 0.4f, 0.8f, 1f))
+                gl_Position = projection * view * model * vec4(aPosition, 1.0);
+            }";
+
+            string fragmentShaderCode = @"
+            #version 330 core
+
+            out vec4 FragColor;
+
+            void main()
+            {
+                FragColor = vec4(1.0, 0.5, 0.2, 1.0);
+            }";
+
+            shaderProgram = new Shader(vertexShaderCode, fragmentShaderCode);
+
+            // Создание геометрии
+            vertexArrays = new[]
+            {
+                CreateCube(),
+                CreatePyramid(),
+                CreateCylinder(1f, 0.5f, 16)
             };
 
-            this.vertexCount = vertices.Length;
+            // Матрицы
+            projectionMatrix = Matrix4.CreatePerspectiveFieldOfView(
+                MathHelper.DegreesToRadians(45f),
+                Size.X / (float)Size.Y,
+                0.1f,
+                100f);
 
-            int[] indices = new int[] { 0, 1, 2 };
+            viewMatrix = Matrix4.LookAt(
+                new Vector3(3f, 3f, 3f),
+                Vector3.Zero,
+                Vector3.UnitY);
 
-            this.indexCount = indices.Length;
-
-            this.vertexBuffer = new VertexBuffer(VertexPositionColor.VertexInfo, vertices.Length, true);
-            this.vertexBuffer.SetData(vertices, vertices.Length);
-
-            this.indexBuffer = new IndexBuffer(indices.Length, true);
-            this.indexBuffer.SetData(indices, indices.Length);
-
-            this.vertexArray = new VertexArray(this.vertexBuffer);
-
-            string vertexShaderCode =
-                @"
-                #version 330 core
-
-                uniform vec2 ViewportSize;
-                uniform float ColorFactor;
-
-                layout (location = 0) in vec2 aPosition;
-                layout (location = 1) in vec4 aColor;
-
-                out vec4 vColor;
-
-                void main()
-                {
-                    float nx = aPosition.x / ViewportSize.x * 2f - 1f;
-                    float ny = aPosition.y / ViewportSize.y * 2f - 1f;
-                    gl_Position = vec4(nx, ny, 0f, 1f);
-
-                    vColor = aColor * ColorFactor;
-                }
-                ";
-
-            string pixelShaderCode =
-                @"
-                #version 330 core
-
-                in vec4 vColor;
-
-                out vec4 pixelColor;
-
-                void main()
-                {
-                    pixelColor = vColor;
-                }
-                ";
-
-            this.shaderProgram = new Shader(vertexShaderCode, pixelShaderCode);
-
-            int[] viewport = new int[4];
-            GL.GetInteger(GetPName.Viewport, viewport);
-
-            this.shaderProgram.SetUniform("ViewportSize", (float)viewport[2], (float)viewport[3]);
+            modelMatrices = new[]
+            {
+                Matrix4.Identity, // Куб
+                Matrix4.CreateTranslation(2f, 0f, 0f), // Пирамида
+                Matrix4.CreateTranslation(-2f, 0f, 0f) // Цилиндр
+            };
 
             base.OnLoad();
         }
 
         protected override void OnUnload()
         {
-            this.vertexArray?.Dispose();
-            this.indexBuffer?.Dispose();
-            this.vertexBuffer?.Dispose();
+            foreach (var va in vertexArrays)
+            {
+                va.Dispose();
+            }
 
+            shaderProgram.Dispose();
             base.OnUnload();
-        }
-
-        private void ApplyTransformation()
-        {
-            translationMatrix = Matrix4.CreateTranslation(moveSpeed, 0, 0);
-
-            for (int i = 0; i < currentShape.Length; i++)
-            {
-                Vector4 vertex = new Vector4(currentShape[i].X, currentShape[i].Y, 0, 1);
-                Vector4 transformedVertex = translationMatrix * vertex;
-                currentShape[i] = new Vector2(transformedVertex.X, transformedVertex.Y);
-            }
-        }
-
-        protected override void OnUpdateFrame(FrameEventArgs args)
-        {
-            base.OnUpdateFrame(args);
-
-            ApplyTransformation();
-
-            VertexPositionColor[] vertices = new VertexPositionColor[this.currentShape.Length];
-            for (int i = 0; i < this.currentShape.Length; i++)
-            {
-                vertices[i] = new VertexPositionColor(this.currentShape[i], new Color4(0.2f, 0.4f, 0.8f, 1f));
-            }
-
-            this.vertexBuffer.SetData(vertices, vertices.Length);
-
-            base.OnUpdateFrame(args);
         }
 
         protected override void OnRenderFrame(FrameEventArgs args)
         {
-            GL.Clear(ClearBufferMask.ColorBufferBit);
+            GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
 
-            GL.UseProgram(this.shaderProgram.ShaderProgramHandle);
+            shaderProgram.Use();
 
-            GL.BindVertexArray(this.vertexArray.VertexArrayHandle);
-            GL.BindBuffer(BufferTarget.ElementArrayBuffer, this.indexBuffer.IndexBufferHandle);
-            GL.DrawElements(PrimitiveType.Triangles, this.indexCount, DrawElementsType.UnsignedInt, 0);
+            shaderProgram.SetUniform("projection", projectionMatrix);
+            shaderProgram.SetUniform("view", viewMatrix);
 
-            this.Context.SwapBuffers();
+            foreach (var (vertexArray, modelMatrix) in vertexArrays.Zip(modelMatrices))
+            {
+                shaderProgram.SetUniform("model", modelMatrix);
+                vertexArray.Bind();
+                GL.DrawElements(PrimitiveType.Triangles, vertexArray.IndexCount, DrawElementsType.UnsignedInt, 0);
+            }
+
+            SwapBuffers();
             base.OnRenderFrame(args);
+        }
+
+        private VertexArray CreateCube()
+        {
+            // Куб: 8 вершин, 12 треугольников
+            float[] vertices =
+            {
+                // Front face
+                -0.5f, -0.5f,  0.5f,
+                 0.5f, -0.5f,  0.5f,
+                 0.5f,  0.5f,  0.5f,
+                -0.5f,  0.5f,  0.5f,
+                // Back face
+                -0.5f, -0.5f, -0.5f,
+                 0.5f, -0.5f, -0.5f,
+                 0.5f,  0.5f, -0.5f,
+                -0.5f,  0.5f, -0.5f,
+            };
+
+            int[] indices =
+            {
+                // Front
+                0, 1, 2, 0, 2, 3,
+                // Back
+                4, 5, 6, 4, 6, 7,
+                // Left
+                0, 3, 7, 0, 7, 4,
+                // Right
+                1, 2, 6, 1, 6, 5,
+                // Top
+                2, 3, 7, 2, 7, 6,
+                // Bottom
+                0, 1, 5, 0, 5, 4
+            };
+
+            return new VertexArray(vertices, indices);
+        }
+
+        private VertexArray CreatePyramid()
+        {
+            // Пирамида с квадратным основанием
+            float[] vertices =
+            {
+                // Основание
+                -0.5f, 0f,  0.5f,
+                 0.5f, 0f,  0.5f,
+                 0.5f, 0f, -0.5f,
+                -0.5f, 0f, -0.5f,
+                // Вершина
+                 0f,   1f,  0f,
+            };
+
+            int[] indices =
+            {
+                // Основание
+                0, 1, 2, 0, 2, 3,
+                // Стороны
+                0, 1, 4,
+                1, 2, 4,
+                2, 3, 4,
+                3, 0, 4
+            };
+
+            return new VertexArray(vertices, indices);
+        }
+
+        private VertexArray CreateCylinder(float height, float radius, int segments)
+        {
+            // Цилиндр: точки оснований и боковые поверхности
+            var vertices = new List<float>();
+            var indices = new List<int>();
+
+            // Верхнее и нижнее основание
+            for (int i = 0; i <= segments; i++)
+            {
+                float angle = MathHelper.TwoPi / segments * i;
+                float x = radius * MathF.Cos(angle);
+                float z = radius * MathF.Sin(angle);
+                // Верхняя точка
+                vertices.Add(x);
+                vertices.Add(height / 2);
+                vertices.Add(z);
+                // Нижняя точка
+                vertices.Add(x);
+                vertices.Add(-height / 2);
+                vertices.Add(z);
+            }
+
+            // Индексы
+            for (int i = 0; i < segments; i++)
+            {
+                indices.Add(i * 2);
+                indices.Add((i + 1) * 2);
+                indices.Add(i * 2 + 1);
+
+                indices.Add(i * 2 + 1);
+                indices.Add((i + 1) * 2);
+                indices.Add((i + 1) * 2 + 1);
+            }
+
+            return new VertexArray(vertices.ToArray(), indices.ToArray());
         }
     }
 }
